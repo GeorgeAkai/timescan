@@ -59,7 +59,15 @@ export default function UploadScanner({ onExtract }: UploadScannerProps) {
     setCameraError(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" },
+        // Ask for the rear camera at the highest resolution it can provide.
+        // Without these hints the browser hands back a low default stream
+        // (often 640x480), which makes captured timecards blurry and hard to
+        // OCR. "ideal" lets the device fall back gracefully if it can't hit 4K.
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 3840 },
+          height: { ideal: 2160 },
+        },
         audio: false,
       });
       streamRef.current = stream;
@@ -76,8 +84,38 @@ export default function UploadScanner({ onExtract }: UploadScannerProps) {
     }
   }, []);
 
-  const capturePhoto = useCallback(() => {
+  const capturePhoto = useCallback(async () => {
+    const stream = streamRef.current;
     const video = videoRef.current;
+    if (!stream) return;
+
+    // Prefer ImageCapture.takePhoto(): it returns a still at the camera's
+    // full *photo* resolution rather than the lower-res video preview frame,
+    // giving noticeably sharper scans. Supported on Chrome/Android; Safari
+    // and others fall through to the canvas grab below.
+    const track = stream.getVideoTracks()[0];
+    const ImageCaptureCtor = (
+      window as unknown as {
+        ImageCapture?: new (t: MediaStreamTrack) => {
+          takePhoto: () => Promise<Blob>;
+        };
+      }
+    ).ImageCapture;
+    if (track && ImageCaptureCtor) {
+      try {
+        const blob = await new ImageCaptureCtor(track).takePhoto();
+        setFile(
+          new File([blob], `timecard-${Date.now()}.jpg`, {
+            type: blob.type || "image/jpeg",
+          })
+        );
+        stopCamera();
+        return;
+      } catch {
+        // Not supported for this track — fall back to a canvas capture.
+      }
+    }
+
     if (!video) return;
     const canvas = document.createElement("canvas");
     canvas.width = video.videoWidth;
@@ -89,7 +127,7 @@ export default function UploadScanner({ onExtract }: UploadScannerProps) {
       if (!blob) return;
       setFile(new File([blob], `timecard-${Date.now()}.jpg`, { type: "image/jpeg" }));
       stopCamera();
-    }, "image/jpeg", 0.92);
+    }, "image/jpeg", 0.95);
   }, [setFile, stopCamera]);
 
   const scan = useCallback(async () => {
@@ -190,15 +228,16 @@ export default function UploadScanner({ onExtract }: UploadScannerProps) {
         >
           Use camera
         </button>
-        {/* Fallback for browsers where getUserMedia is unavailable (e.g. some
-            in-app browsers): the capture attribute opens the native camera
-            app directly on mobile. */}
+        {/* The capture attribute opens the native camera app, which shoots at
+            the phone's full sensor resolution — sharper than the in-app live
+            stream (and the only high-res path on iOS, which lacks
+            ImageCapture). Offered as its own button on mobile. */}
         <button
           type="button"
           onClick={() => captureInputRef.current?.click()}
-          className="text-sm text-primary underline sm:hidden"
+          className="w-full rounded-full border border-border bg-surface px-5 py-3 text-sm font-medium transition-colors hover:bg-surface-muted sm:hidden"
         >
-          Take photo instead
+          Take photo (best quality)
         </button>
         <input
           ref={captureInputRef}
