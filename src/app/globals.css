@@ -1,26 +1,81 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Simplistic blue theme — light */
+  --background: #f6f9fe;
+  --foreground: #0f172a;
+  --surface: #ffffff;
+  --surface-muted: #eff6ff;
+  --border: #dbe4f2;
+  --muted: #64748b;
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --primary-foreground: #ffffff;
+  --ring: rgba(37, 99, 235, 0.25);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-border: var(--border);
+  --color-muted: var(--muted);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #0a0f1a;
+    --foreground: #e6edf6;
+    --surface: #111827;
+    --surface-muted: #172033;
+    --border: #1f2b40;
+    --muted: #93a4bd;
+    --primary: #3b82f6;
+    --primary-hover: #60a5fa;
+    --primary-foreground: #0a0f1a;
+    --ring: rgba(59, 130, 246, 0.3);
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Remove the 300ms tap delay and stray highlight on interactive controls */
+button,
+a,
+input,
+textarea,
+select,
+[role="button"] {
+  touch-action: manipulation;
+}
+
+/* Consistent blue focus ring for all inputs, textareas and selects */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
+/* On phones, keep form controls at >=16px so iOS Safari never zooms in on
+   focus, and give them comfortable touch targets. */
+@media (max-width: 640px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
 }

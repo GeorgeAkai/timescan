@@ -41,15 +41,15 @@ export default function HistoryPage() {
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-6 py-12">
-      <h1 className="text-2xl font-semibold tracking-tight">History</h1>
+    <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 py-8 sm:px-6 sm:py-12">
+      <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">History</h1>
 
-      {loading && <p className="text-sm text-zinc-500">Loading…</p>}
+      {loading && <p className="text-sm text-muted">Loading…</p>}
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
       {!loading && records.length === 0 && (
-        <p className="text-sm text-zinc-500">
+        <p className="text-sm text-muted">
           No saved timecards yet. Go scan one on the{" "}
-          <Link href="/" className="underline">
+          <Link href="/" className="font-medium text-primary underline">
             Scan
           </Link>{" "}
           page.
@@ -60,40 +60,40 @@ export default function HistoryPage() {
         {records.map((record) => (
           <div
             key={record.id}
-            className="flex flex-col gap-2 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800"
+            className="flex flex-col gap-2 rounded-xl border border-border bg-surface p-4 transition-colors hover:border-primary/50 sm:p-5"
           >
             <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="font-medium">{record.name}</p>
-                <p className="text-sm text-zinc-500">{record.date}</p>
+              <div className="min-w-0">
+                <p className="truncate font-medium">{record.name}</p>
+                <p className="text-sm text-muted">{record.date}</p>
               </div>
-              <div className="text-right">
-                <p className="font-mono font-semibold">
+              <div className="flex shrink-0 flex-col items-end gap-1">
+                <p className="font-mono text-lg font-semibold text-primary">
                   {formatMinutes(record.totalMinutes)}
                 </p>
                 <button
                   onClick={() => remove(record.id)}
-                  className="text-xs text-red-600 hover:underline dark:text-red-400"
+                  className="-mr-2 rounded-md px-2 py-1 text-xs text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
                 >
                   Delete
                 </button>
               </div>
             </div>
             {record.notes && (
-              <p className="text-sm text-zinc-600 dark:text-zinc-400">{record.notes}</p>
+              <p className="text-sm text-muted">{record.notes}</p>
             )}
             <details className="text-sm">
-              <summary className="cursor-pointer text-zinc-500">
+              <summary className="cursor-pointer py-1 text-muted transition-colors hover:text-primary">
                 {record.rows.length} entr{record.rows.length === 1 ? "y" : "ies"}
               </summary>
-              <ul className="mt-2 flex flex-col gap-1">
+              <ul className="mt-2 flex flex-col gap-2 border-t border-border pt-2">
                 {record.rows.map((row) => (
-                  <li key={row.id} className="flex justify-between gap-3">
-                    <span>{row.label}</span>
-                    <span className="text-zinc-500">
+                  <li key={row.id} className="flex items-baseline justify-between gap-3">
+                    <span className="shrink-0 font-medium">{row.label}</span>
+                    <span className="min-w-0 flex-1 truncate text-muted">
                       {row.times.filter(Boolean).join(", ") || "—"}
                     </span>
-                    <span className="font-mono">{formatMinutes(row.minutes)}</span>
+                    <span className="shrink-0 font-mono">{formatMinutes(row.minutes)}</span>
                   </li>
                 ))}
               </ul>

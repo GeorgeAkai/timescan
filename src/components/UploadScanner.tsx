@@ -129,19 +129,19 @@ export default function UploadScanner({ onExtract }: UploadScannerProps) {
   if (cameraOpen) {
     return (
       <div className="flex flex-col gap-3">
-        <div className="overflow-hidden rounded-xl border border-zinc-300 dark:border-zinc-700">
+        <div className="overflow-hidden rounded-xl border border-border">
           <video ref={videoRef} autoPlay playsInline muted className="w-full" />
         </div>
         <div className="flex gap-3">
           <button
             onClick={capturePhoto}
-            className="rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background hover:bg-[#383838] dark:hover:bg-[#ccc]"
+            className="flex-1 rounded-full bg-primary px-5 py-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover sm:flex-none sm:py-2.5"
           >
             Capture photo
           </button>
           <button
             onClick={stopCamera}
-            className="rounded-full border border-zinc-300 px-5 py-2.5 text-sm font-medium hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900"
+            className="rounded-full border border-border bg-surface px-5 py-3 text-sm font-medium transition-colors hover:bg-surface-muted sm:py-2.5"
           >
             Cancel
           </button>
@@ -156,8 +156,8 @@ export default function UploadScanner({ onExtract }: UploadScannerProps) {
         {...getRootProps()}
         className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-8 text-center transition-colors ${
           isDragActive
-            ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30"
-            : "border-zinc-300 hover:border-zinc-400 dark:border-zinc-700"
+            ? "border-primary bg-surface-muted"
+            : "border-border bg-surface hover:border-primary/60 hover:bg-surface-muted"
         }`}
       >
         <input {...getInputProps()} />
@@ -166,20 +166,27 @@ export default function UploadScanner({ onExtract }: UploadScannerProps) {
           <img
             src={previewUrl}
             alt="Timecard preview"
-            className="max-h-64 rounded-md object-contain"
+            className="max-h-64 max-w-full rounded-md object-contain"
           />
         ) : (
-          <p className="text-sm text-zinc-500">
-            Drag & drop a timecard photo here, or click to select a file
+          <p className="text-sm text-muted">
+            Drag &amp; drop a timecard photo here, or click to select a file
           </p>
         )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <button
+          onClick={scan}
+          disabled={!previewUrl || status === "scanning"}
+          className="order-1 w-full rounded-full bg-primary px-5 py-3 text-sm font-medium text-primary-foreground shadow-sm shadow-primary/20 transition-colors enabled:hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-40 sm:order-none sm:w-auto sm:py-2.5"
+        >
+          {status === "scanning" ? `Scanning… ${progress}%` : "Scan timecard"}
+        </button>
         <button
           type="button"
           onClick={openCamera}
-          className="rounded-full border border-zinc-300 px-5 py-2.5 text-sm font-medium hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900"
+          className="w-full rounded-full border border-border bg-surface px-5 py-3 text-sm font-medium transition-colors hover:bg-surface-muted sm:w-auto sm:py-2.5"
         >
           Use camera
         </button>
@@ -189,7 +196,7 @@ export default function UploadScanner({ onExtract }: UploadScannerProps) {
         <button
           type="button"
           onClick={() => captureInputRef.current?.click()}
-          className="text-sm text-zinc-500 underline sm:hidden"
+          className="text-sm text-primary underline sm:hidden"
         >
           Take photo instead
         </button>
@@ -205,14 +212,6 @@ export default function UploadScanner({ onExtract }: UploadScannerProps) {
             e.target.value = "";
           }}
         />
-
-        <button
-          onClick={scan}
-          disabled={!previewUrl || status === "scanning"}
-          className="rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background transition-colors enabled:hover:bg-[#383838] disabled:cursor-not-allowed disabled:opacity-40 dark:enabled:hover:bg-[#ccc]"
-        >
-          {status === "scanning" ? `Scanning… ${progress}%` : "Scan timecard"}
-        </button>
       </div>
 
       {cameraError && (
@@ -224,14 +223,14 @@ export default function UploadScanner({ onExtract }: UploadScannerProps) {
 
       {enhancedPreviewUrl && (
         <details className="text-sm">
-          <summary className="cursor-pointer text-zinc-500">
+          <summary className="cursor-pointer text-muted transition-colors hover:text-primary">
             Show enhanced image used for OCR
           </summary>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={enhancedPreviewUrl}
             alt="Contrast-enhanced timecard used for OCR"
-            className="mt-2 max-h-96 rounded-md border border-zinc-200 object-contain dark:border-zinc-800"
+            className="mt-2 max-h-96 max-w-full rounded-md border border-border object-contain"
           />
         </details>
       )}

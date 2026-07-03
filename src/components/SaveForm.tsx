@@ -52,34 +52,34 @@ export default function SaveForm({ rows, onSaved }: SaveFormProps) {
   };
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+    <div className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-4 sm:p-5">
       <div className="grid gap-3 sm:grid-cols-2">
-        <label className="flex flex-col gap-1 text-sm">
+        <label className="flex flex-col gap-1 text-sm font-medium">
           Name
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Employee name"
-            className="rounded border border-zinc-300 bg-transparent px-2 py-1.5 dark:border-zinc-700"
+            className="rounded-md border border-border bg-transparent px-3 py-2 font-normal"
           />
         </label>
-        <label className="flex flex-col gap-1 text-sm">
+        <label className="flex flex-col gap-1 text-sm font-medium">
           Date
           <input
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            className="rounded border border-zinc-300 bg-transparent px-2 py-1.5 dark:border-zinc-700"
+            className="rounded-md border border-border bg-transparent px-3 py-2 font-normal"
           />
         </label>
       </div>
-      <label className="flex flex-col gap-1 text-sm">
+      <label className="flex flex-col gap-1 text-sm font-medium">
         Notes (optional)
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           rows={2}
-          className="rounded border border-zinc-300 bg-transparent px-2 py-1.5 dark:border-zinc-700"
+          className="rounded-md border border-border bg-transparent px-3 py-2 font-normal"
         />
       </label>
 
@@ -88,7 +88,7 @@ export default function SaveForm({ rows, onSaved }: SaveFormProps) {
       <button
         onClick={handleSave}
         disabled={saving}
-        className="self-start rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background transition-colors enabled:hover:bg-[#383838] disabled:cursor-not-allowed disabled:opacity-40 dark:enabled:hover:bg-[#ccc]"
+        className="w-full rounded-full bg-primary px-5 py-3 text-sm font-medium text-primary-foreground shadow-sm shadow-primary/20 transition-colors enabled:hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto sm:self-start sm:py-2.5"
       >
         {saving ? "Saving…" : "Save timecard"}
       </button>
