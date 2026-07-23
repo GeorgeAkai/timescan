@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { createWorker, PSM } from "tesseract.js";
 import { preprocessForOcr } from "@/lib/imagePreprocess";
+import { recognizeStampTimes } from "@/lib/stampOcr";
 
 interface UploadScannerProps {
   onExtract: (text: string) => void;
@@ -138,8 +139,20 @@ export default function UploadScanner({ onExtract }: UploadScannerProps) {
     setError(null);
 
     try {
-      const canvas = await preprocessForOcr(file);
+      const { canvas, binary, width, height } = await preprocessForOcr(file);
       setEnhancedPreviewUrl(canvas.toDataURL("image/png"));
+
+      // First try the purpose-built dot-matrix recognizer. Time-clock punch
+      // fonts are grids of disconnected dots that Tesseract's LSTM model
+      // can't read, so this template matcher handles the common uPunch-style
+      // cards; Tesseract stays as a fallback for ordinary printed fonts.
+      const stampText = recognizeStampTimes(binary, width, height);
+      if (stampText.trim()) {
+        setProgress(100);
+        setStatus("done");
+        onExtract(stampText);
+        return;
+      }
 
       const worker = await createWorker("eng", 1, {
         logger: (m) => {

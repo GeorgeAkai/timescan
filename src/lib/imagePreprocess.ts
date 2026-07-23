@@ -1,6 +1,10 @@
-// Timecards are often small/faint dot-matrix prints, sometimes with a
-// watermark behind the text. Upscaling + grayscale + a binarizing threshold
-// noticeably improves Tesseract's read rate on this kind of source image.
+// Timecards are often small/faint dot-matrix prints on a green ruled grid,
+// photographed under uneven lighting. Upscaling + an adaptive, green-aware
+// binarization (see binarizeTimecard) keeps the punch ink legible while
+// fading the printed grid — both for the template-matching stamp recognizer
+// and for Tesseract's fallback pass on ordinary-font cards.
+
+import { binarizeTimecard } from "./stampOcr";
 
 function loadImage(file: File | Blob): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -19,10 +23,29 @@ function loadImage(file: File | Blob): Promise<HTMLImageElement> {
 }
 
 const TARGET_MIN_DIMENSION = 1400;
+// Guard against multiplying a large photo's pixel count past what canvas /
+// the O(w·h) passes can handle comfortably on a phone.
+const MAX_DIMENSION = 3000;
 
-export async function preprocessForOcr(file: File | Blob): Promise<HTMLCanvasElement> {
+export interface PreprocessResult {
+  /** Black-and-white canvas suitable for preview and as a Tesseract input. */
+  canvas: HTMLCanvasElement;
+  /** Row-major bitmap, 0 = ink, 255 = paper — input for recognizeStampTimes. */
+  binary: Uint8Array;
+  width: number;
+  height: number;
+}
+
+export async function preprocessForOcr(file: File | Blob): Promise<PreprocessResult> {
   const img = await loadImage(file);
-  const scale = Math.max(1, TARGET_MIN_DIMENSION / Math.min(img.width, img.height));
+  const minSide = Math.min(img.width, img.height);
+  const maxSide = Math.max(img.width, img.height);
+  // Upscale faint/small cards toward the target, but never blow the longest
+  // edge past MAX_DIMENSION.
+  const scale = Math.min(
+    Math.max(1, TARGET_MIN_DIMENSION / minSide),
+    MAX_DIMENSION / maxSide
+  );
 
   const canvas = document.createElement("canvas");
   canvas.width = Math.round(img.width * scale);
@@ -33,27 +56,17 @@ export async function preprocessForOcr(file: File | Blob): Promise<HTMLCanvasEle
   ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const binary = binarizeTimecard(imageData.data, canvas.width, canvas.height);
+
+  // Paint the binary back onto the canvas so the "enhanced image used for
+  // OCR" preview and the Tesseract fallback see exactly what the stamp
+  // recognizer saw.
   const { data } = imageData;
-
-  // Grayscale + running average for a global threshold.
-  let sum = 0;
-  const gray = new Uint8ClampedArray(data.length / 4);
-  for (let i = 0, p = 0; i < data.length; i += 4, p++) {
-    const value = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-    gray[p] = value;
-    sum += value;
+  for (let p = 0, i = 0; p < binary.length; p++, i += 4) {
+    data[i] = data[i + 1] = data[i + 2] = binary[p];
+    data[i + 3] = 255;
   }
-  const mean = sum / gray.length;
-  // Print is usually darker than both the paper and any faint watermark, so
-  // biasing the threshold below the mean keeps genuine ink while dropping
-  // light background noise.
-  const threshold = mean * 0.82;
-
-  for (let i = 0, p = 0; i < data.length; i += 4, p++) {
-    const value = gray[p] < threshold ? 0 : 255;
-    data[i] = data[i + 1] = data[i + 2] = value;
-  }
-
   ctx.putImageData(imageData, 0, 0);
-  return canvas;
+
+  return { canvas, binary, width: canvas.width, height: canvas.height };
 }
