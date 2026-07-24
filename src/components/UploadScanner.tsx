@@ -2,17 +2,16 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useDropzone } from "react-dropzone";
-import { createWorker, PSM } from "tesseract.js";
-import { preprocessForOcr } from "@/lib/imagePreprocess";
-import { recognizeStampTimes } from "@/lib/stampOcr";
+import { prepareImageForVision } from "@/lib/imageResize";
+import { minutesFromColumnAlignedTimeStrings } from "@/lib/timeParser";
+import type { ParsedRow } from "@/lib/types";
 
 interface UploadScannerProps {
-  onExtract: (text: string) => void;
+  onScanned: (rows: ParsedRow[]) => void;
 }
 
-export default function UploadScanner({ onExtract }: UploadScannerProps) {
+export default function UploadScanner({ onScanned }: UploadScannerProps) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState<"idle" | "scanning" | "done" | "error">(
     "idle"
   );
@@ -30,7 +29,6 @@ export default function UploadScanner({ onExtract }: UploadScannerProps) {
     setPreviewUrl(URL.createObjectURL(file));
     setEnhancedPreviewUrl(null);
     setStatus("idle");
-    setProgress(0);
     setError(null);
   }, []);
 
@@ -135,47 +133,42 @@ export default function UploadScanner({ onExtract }: UploadScannerProps) {
     const file = fileRef.current;
     if (!file) return;
     setStatus("scanning");
-    setProgress(0);
     setError(null);
 
     try {
-      const { canvas, binary, width, height } = await preprocessForOcr(file);
-      setEnhancedPreviewUrl(canvas.toDataURL("image/png"));
+      // Downscale the colour photo and hand it to the vision model, which
+      // reads the dot-matrix punch stamps directly — no client-side OCR.
+      const { base64, mediaType, dataUrl } = await prepareImageForVision(file);
+      setEnhancedPreviewUrl(dataUrl);
 
-      // First try the purpose-built dot-matrix recognizer. Time-clock punch
-      // fonts are grids of disconnected dots that Tesseract's LSTM model
-      // can't read, so this template matcher handles the common uPunch-style
-      // cards; Tesseract stays as a fallback for ordinary printed fonts.
-      const stampText = recognizeStampTimes(binary, width, height);
-      if (stampText.trim()) {
-        setProgress(100);
-        setStatus("done");
-        onExtract(stampText);
-        return;
+      const res = await fetch("/api/scan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: base64, mediaType }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error || "Failed to read the timecard");
       }
 
-      const worker = await createWorker("eng", 1, {
-        logger: (m) => {
-          if (m.status === "recognizing text") {
-            setProgress(Math.round(m.progress * 100));
-          }
-        },
-      });
-      // Timecards are scattered rows of short number groups rather than
-      // prose paragraphs, so sparse-text mode reads them more reliably than
-      // the default "auto" page segmentation.
-      await worker.setParameters({ tessedit_pageseg_mode: PSM.SPARSE_TEXT });
-      const {
-        data: { text },
-      } = await worker.recognize(canvas);
-      await worker.terminate();
+      const rows: ParsedRow[] = (data.rows ?? []).map(
+        (r: { label?: string; times?: string[] }) => {
+          const times = Array.isArray(r.times) ? r.times : [];
+          return {
+            id: crypto.randomUUID(),
+            label: typeof r.label === "string" && r.label ? r.label : "",
+            times,
+            minutes: minutesFromColumnAlignedTimeStrings(times),
+          };
+        }
+      );
       setStatus("done");
-      onExtract(text);
+      onScanned(rows);
     } catch (err) {
       setStatus("error");
       setError(err instanceof Error ? err.message : "Failed to scan image");
     }
-  }, [onExtract]);
+  }, [onScanned]);
 
   if (cameraOpen) {
     return (
@@ -232,7 +225,7 @@ export default function UploadScanner({ onExtract }: UploadScannerProps) {
           disabled={!previewUrl || status === "scanning"}
           className="order-1 w-full rounded-full bg-primary px-5 py-3 text-sm font-medium text-primary-foreground shadow-sm shadow-primary/20 transition-colors enabled:hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-40 sm:order-none sm:w-auto sm:py-2.5"
         >
-          {status === "scanning" ? `Scanning… ${progress}%` : "Scan timecard"}
+          {status === "scanning" ? "Scanning…" : "Scan timecard"}
         </button>
         <button
           type="button"
@@ -276,12 +269,12 @@ export default function UploadScanner({ onExtract }: UploadScannerProps) {
       {enhancedPreviewUrl && (
         <details className="text-sm">
           <summary className="cursor-pointer text-muted transition-colors hover:text-primary">
-            Show enhanced image used for OCR
+            Show image sent to the scanner
           </summary>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={enhancedPreviewUrl}
-            alt="Contrast-enhanced timecard used for OCR"
+            alt="Timecard image sent to the scanner"
             className="mt-2 max-h-96 max-w-full rounded-md border border-border object-contain"
           />
         </details>

@@ -9,11 +9,11 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.114.0",
     "next": "16.2.10",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-dropzone": "^15.0.0",
-    "tesseract.js": "^7.0.0",
     "uuid": "^14.0.1"
   },
   "devDependencies": {

@@ -5,7 +5,6 @@ import Link from "next/link";
 import UploadScanner from "@/components/UploadScanner";
 import TimeEntriesEditor from "@/components/TimeEntriesEditor";
 import SaveForm from "@/components/SaveForm";
-import { parseTimecardText } from "@/lib/timeParser";
 import type { ParsedRow } from "@/lib/types";
 
 function StepHeading({ step, children }: { step: number; children: React.ReactNode }) {
@@ -22,17 +21,18 @@ function StepHeading({ step, children }: { step: number; children: React.ReactNo
 export default function Home() {
   const [rows, setRows] = useState<ParsedRow[]>([]);
   const [savedMessage, setSavedMessage] = useState(false);
-  const [rawText, setRawText] = useState<string | null>(null);
+  const [scanned, setScanned] = useState(false);
 
-  const handleExtract = (text: string) => {
-    setRows(parseTimecardText(text));
-    setRawText(text);
+  const handleScanned = (scannedRows: ParsedRow[]) => {
+    setRows(scannedRows);
+    setScanned(true);
     setSavedMessage(false);
   };
 
   const handleSaved = () => {
     setSavedMessage(true);
     setRows([]);
+    setScanned(false);
   };
 
   return (
@@ -46,29 +46,18 @@ export default function Home() {
 
       <section className="flex flex-col gap-3">
         <StepHeading step={1}>Scan timecard</StepHeading>
-        <UploadScanner onExtract={handleExtract} />
+        <UploadScanner onScanned={handleScanned} />
       </section>
 
       <section className="flex flex-col gap-3">
         <StepHeading step={2}>Review &amp; edit entries</StepHeading>
-        {rawText !== null && rows.length === 0 && (
+        {scanned && rows.length === 0 && (
           <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300">
-            No punch times were recognized in the scan. Check the raw text below —
-            if it looks garbled, try rescanning with better lighting/focus, or add
-            rows manually.
+            No punch times were found in the scan. Try rescanning with better
+            lighting/focus, or add rows manually below.
           </p>
         )}
         <TimeEntriesEditor rows={rows} onChange={setRows} />
-        {rawText !== null && (
-          <details className="text-sm">
-            <summary className="cursor-pointer text-muted transition-colors hover:text-primary">
-              Show raw OCR text
-            </summary>
-            <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap rounded-lg border border-border bg-surface-muted p-3 text-xs">
-              {rawText || "(no text detected)"}
-            </pre>
-          </details>
-        )}
       </section>
 
       <section className="flex flex-col gap-3">
