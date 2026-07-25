@@ -4,8 +4,9 @@
 // dot-matrix punch digits to stay legible, but small enough to keep the upload
 // under the serverless request-body limit and the image-token cost reasonable.
 
-// Opus 4.8 vision reads up to ~2576px on the long edge; 2000 keeps the punch
-// digits crisp while trimming tokens and payload versus a full 4032px photo.
+// Vision models generally downsample beyond ~1500-2500px on the long edge, so
+// 2000 keeps the punch digits crisp while trimming tokens and payload versus a
+// full 4032px photo. Raise it if the configured OPENROUTER_MODEL supports more.
 const MAX_EDGE = 2000;
 const JPEG_QUALITY = 0.9;
 
