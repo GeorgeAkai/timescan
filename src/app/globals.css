@@ -1,18 +1,19 @@
 @import "tailwindcss";
 
 :root {
-  /* Simplistic blue theme — light (the default) */
+  /* Green on white — light (the default) */
   color-scheme: light;
-  --background: #f6f9fe;
-  --foreground: #0f172a;
+  --background: #f4faf6;
+  --foreground: #0c1f13;
   --surface: #ffffff;
-  --surface-muted: #eff6ff;
-  --border: #dbe4f2;
-  --muted: #64748b;
-  --primary: #2563eb;
-  --primary-hover: #1d4ed8;
+  --surface-muted: #e9f5ec;
+  --border: #cde5d4;
+  --muted: #57705f;
+  /* Deep enough that white button text clears 4.5:1 on it. */
+  --primary: #15803d;
+  --primary-hover: #166534;
   --primary-foreground: #ffffff;
-  --ring: rgba(37, 99, 235, 0.25);
+  --ring: rgba(21, 128, 61, 0.25);
 }
 
 @theme inline {
@@ -34,18 +35,20 @@
    so this attribute is the single source of truth — no prefers-color-scheme
    media query here, which would otherwise fight an explicit light choice on a
    dark device. */
+/* Green on black — dark. Surfaces sit just above true black so cards and the
+   sticky header still read as raised, with the green carrying the accents. */
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --background: #0a0f1a;
-  --foreground: #e6edf6;
-  --surface: #111827;
-  --surface-muted: #172033;
-  --border: #1f2b40;
-  --muted: #93a4bd;
-  --primary: #3b82f6;
-  --primary-hover: #60a5fa;
-  --primary-foreground: #0a0f1a;
-  --ring: rgba(59, 130, 246, 0.3);
+  --background: #000000;
+  --foreground: #e4f4e9;
+  --surface: #0b100c;
+  --surface-muted: #131b16;
+  --border: #1f2c24;
+  --muted: #8aa795;
+  --primary: #22c55e;
+  --primary-hover: #4ade80;
+  --primary-foreground: #04140a;
+  --ring: rgba(34, 197, 94, 0.3);
 }
 
 /* Point Tailwind's dark: variant at the same attribute, so utility classes
