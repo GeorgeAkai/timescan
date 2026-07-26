@@ -50,7 +50,7 @@ export default function UploadScanner({ onScanned }: UploadScannerProps) {
 
     try {
       // Downscale the colour photo and hand it to the vision model, which
-      // reads the dot-matrix punch stamps directly — no client-side OCR.
+      // reads the dot-matrix punch stamps directly - no client-side OCR.
       const { base64, mediaType, dataUrl } = await prepareImageForVision(file);
       setEnhancedPreviewUrl(dataUrl);
 
@@ -117,7 +117,7 @@ export default function UploadScanner({ onScanned }: UploadScannerProps) {
           {status === "scanning" ? "Scanning…" : "Scan timecard"}
         </button>
         {/* The capture attribute opens the native camera app, which shoots at
-            the phone's full sensor resolution — sharper than an in-app live
+            the phone's full sensor resolution - sharper than an in-app live
             stream, and the only high-res path on iOS, which lacks ImageCapture.
             Mobile only; desktop uses the dropzone above. */}
         <button
@@ -125,7 +125,7 @@ export default function UploadScanner({ onScanned }: UploadScannerProps) {
           onClick={() => captureInputRef.current?.click()}
           className="w-full rounded-full border border-border bg-surface px-5 py-3 text-sm font-medium transition-colors hover:bg-surface-muted sm:hidden"
         >
-          Take photo (best quality)
+         Use Camera 
         </button>
         <input
           ref={captureInputRef}

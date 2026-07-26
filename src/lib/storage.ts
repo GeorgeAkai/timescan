@@ -3,10 +3,21 @@
 // This used to write data/records.json on the server, which works in local dev
 // but fails on serverless hosting (Vercel and friends give you a read-only
 // filesystem, and any writable scratch space is per-instance and ephemeral).
-// Keeping records client-side removes the failure and means timecards — which
-// carry employee names and hours — never leave the device.
+// Keeping records client-side removes the failure and means timecards - which
+// carry employee names and hours - never leave the device.
 
-import type { ParsedRow, TimecardRecord } from "./types";
+import type { ParsedRow, PaymentStatus, TimecardRecord } from "./types";
+import {
+  MAX_DATE_CHARS,
+  MAX_LABEL_CHARS,
+  MAX_NAME_CHARS,
+  MAX_NOTES_CHARS,
+  MAX_ROWS,
+  MAX_STORED_RECORDS,
+  MAX_TIMES_PER_ROW,
+  MAX_TIME_CHARS,
+  clampText,
+} from "./limits";
 
 const STORAGE_KEY = "timescan.records.v1";
 
@@ -42,6 +53,35 @@ function isRecord(value: unknown): value is TimecardRecord {
   );
 }
 
+/** localStorage is editable by hand and by anything else on this origin, so
+ *  every field is re-checked and re-clamped on the way out, not just on write. */
+function normalize(record: TimecardRecord): TimecardRecord {
+  const rows: ParsedRow[] = (Array.isArray(record.rows) ? record.rows : [])
+    .slice(0, MAX_ROWS)
+    .map((row) => ({
+      id: typeof row?.id === "string" ? row.id.slice(0, 64) : newId(),
+      label: clampText(row?.label, MAX_LABEL_CHARS),
+      times: (Array.isArray(row?.times) ? row.times : [])
+        .slice(0, MAX_TIMES_PER_ROW)
+        .map((t) => clampText(t, MAX_TIME_CHARS)),
+      minutes: Number.isFinite(row?.minutes) ? Math.max(0, Math.trunc(row.minutes)) : 0,
+    }));
+
+  return {
+    id: record.id.slice(0, 64),
+    name: clampText(record.name, MAX_NAME_CHARS),
+    date: clampText(record.date, MAX_DATE_CHARS),
+    notes: clampText(record.notes, MAX_NOTES_CHARS),
+    rows,
+    totalMinutes: Number.isFinite(record.totalMinutes)
+      ? Math.max(0, Math.trunc(record.totalMinutes))
+      : 0,
+    createdAt: clampText(record.createdAt, MAX_DATE_CHARS),
+    // Records written before payment tracking existed default to unpaid.
+    paymentStatus: record.paymentStatus === "paid" ? "paid" : "unpaid",
+  };
+}
+
 export function listRecords(): TimecardRecord[] {
   const store = getStore();
   if (!store) return EMPTY;
@@ -53,7 +93,8 @@ export function listRecords(): TimecardRecord[] {
     const parsed: unknown = JSON.parse(raw);
     // Drop anything malformed rather than crashing the history page on data
     // written by an older version or by hand.
-    return Array.isArray(parsed) ? parsed.filter(isRecord) : EMPTY;
+    if (!Array.isArray(parsed)) return EMPTY;
+    return parsed.filter(isRecord).slice(0, MAX_STORED_RECORDS).map(normalize);
   } catch {
     return EMPTY;
   }
@@ -127,7 +168,7 @@ export interface NewRecordInput {
 
 /** Saves a new record, newest first, and returns it. */
 export function createRecord(input: NewRecordInput): TimecardRecord {
-  const record: TimecardRecord = {
+  const record: TimecardRecord = normalize({
     id: newId(),
     name: input.name,
     date: input.date,
@@ -135,9 +176,11 @@ export function createRecord(input: NewRecordInput): TimecardRecord {
     rows: input.rows,
     totalMinutes: input.totalMinutes,
     createdAt: new Date().toISOString(),
-  };
+    paymentStatus: "unpaid",
+  });
 
-  writeAll([record, ...listRecords()]);
+  // Oldest entries fall off the end so one device can't grow this without bound.
+  writeAll([record, ...listRecords()].slice(0, MAX_STORED_RECORDS));
   return record;
 }
 
@@ -145,6 +188,20 @@ export function deleteRecord(id: string): boolean {
   const records = listRecords();
   const next = records.filter((r) => r.id !== id);
   if (next.length === records.length) return false;
+  writeAll(next);
+  return true;
+}
+
+/** Marks a saved timecard paid or unpaid. */
+export function setPaymentStatus(id: string, paymentStatus: PaymentStatus): boolean {
+  const records = listRecords();
+  let changed = false;
+  const next = records.map((r) => {
+    if (r.id !== id || r.paymentStatus === paymentStatus) return r;
+    changed = true;
+    return { ...r, paymentStatus };
+  });
+  if (!changed) return false;
   writeAll(next);
   return true;
 }

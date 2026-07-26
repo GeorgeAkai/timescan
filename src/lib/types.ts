@@ -5,6 +5,8 @@ export interface ParsedRow {
   minutes: number;
 }
 
+export type PaymentStatus = "paid" | "unpaid";
+
 export interface TimecardRecord {
   id: string;
   name: string;
@@ -13,4 +15,6 @@ export interface TimecardRecord {
   rows: ParsedRow[];
   totalMinutes: number;
   createdAt: string;
+  /** Records saved before this field existed read back as "unpaid". */
+  paymentStatus: PaymentStatus;
 }

@@ -11,7 +11,7 @@ export type ResolvedTheme = "light" | "dark";
 export const THEME_KEY = "timescan.theme";
 
 /** Runs before first paint (inlined into <head>) so the page never flashes the
- *  wrong palette. Kept dependency-free and defensive — it executes before
+ *  wrong palette. Kept dependency-free and defensive - it executes before
  *  React and must never throw. */
 export const THEME_INIT_SCRIPT = `(function(){try{var p=localStorage.getItem(${JSON.stringify(
   THEME_KEY
@@ -50,7 +50,7 @@ export function setPreference(preference: ThemePreference): void {
       window.localStorage.setItem(THEME_KEY, preference);
     }
   } catch {
-    // Storage blocked — the theme still applies for this session.
+    // Storage blocked - the theme still applies for this session.
   }
   apply(preference);
   for (const listener of listeners) listener();

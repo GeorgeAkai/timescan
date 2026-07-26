@@ -5,7 +5,7 @@ import type { ParsedRow } from "./types";
 // a period, semicolon, or comma. But "." and "," are also how decimal totals
 // and currency are written (e.g. a "TOTAL HRS" column reading "8.00", or
 // "$25.00"), so outside of a real ":" a match is only trusted when an AM/PM
-// marker confirms it's actually a clock time — see isTrustedTimeMatch below.
+// marker confirms it's actually a clock time - see isTrustedTimeMatch below.
 const TIME_TOKEN =
   /\b(\d{1,2})([:.;,])(\d{2})\s*([AaPp]\.?\s?[Mm]\.?)?\b/g;
 const TIME_TOKEN_SINGLE =
@@ -29,8 +29,8 @@ const LABEL_TOKEN =
 
 /**
  * Resolves a possibly-ambiguous 12-hour punch (no AM/PM marker) into minutes
- * since midnight. Rather than guessing AM/PM from position alone — which
- * breaks for cards that put each shift on its own line — this anchors off
+ * since midnight. Rather than guessing AM/PM from position alone - which
+ * breaks for cards that put each shift on its own line - this anchors off
  * the previous punch in the same row and picks whichever of the AM/PM
  * readings keeps the sequence moving forward in time, since punches within
  * a row are always in chronological order.
@@ -56,14 +56,14 @@ export function resolveHourMinute(
   if (previousMinutes === null) {
     // No prior punch to anchor against: the first punch in a row is assumed
     // to be a morning clock-in (the overwhelmingly common case) unless it's
-    // literally "12:xx", which is read as noon. This is only a default —
+    // literally "12:xx", which is read as noon. This is only a default -
     // afternoon/evening shift rows may need manual correction in the editor,
     // which an explicit "PM" always overrides.
     return hour === 12 ? pmCandidate : amCandidate;
   }
   if (amCandidate >= previousMinutes) return amCandidate;
   if (pmCandidate >= previousMinutes) return pmCandidate;
-  // Both readings are earlier than the previous punch — pick the later one.
+  // Both readings are earlier than the previous punch - pick the later one.
   return Math.max(amCandidate, pmCandidate);
 }
 
@@ -102,7 +102,7 @@ function resolveRowPunches(
  * Resolves a column-aligned punch list (used by the grid editor, where index
  * 2i/2i+1 are always the same IN/OUT column pair, even if a cell is blank)
  * into total worked minutes. Unlike the flat/sequential OCR path, a blank or
- * unparsed cell doesn't shift its neighbors — only a pair where both sides
+ * unparsed cell doesn't shift its neighbors - only a pair where both sides
  * are present contributes to the total.
  */
 export function minutesFromColumnAlignedTimeStrings(timeStrings: string[]): number {
@@ -151,7 +151,7 @@ export function parseTimecardText(text: string): ParsedRow[] {
     while ((m = TIME_TOKEN.exec(line)) !== null) {
       const [, hourStr, separator, minuteStr, rawMeridiem] = m;
       if (!isTrustedTimeMatch(separator, rawMeridiem)) continue;
-      // Normalize to "H:MM AM/PM" so the separator is never a comma — the
+      // Normalize to "H:MM AM/PM" so the separator is never a comma - the
       // editor UI joins/splits this list on commas.
       const meridiem = rawMeridiem ? ` ${rawMeridiem.replace(/[.\s]/g, "").toUpperCase()}` : "";
       times.push(`${hourStr}:${minuteStr}${meridiem}`);

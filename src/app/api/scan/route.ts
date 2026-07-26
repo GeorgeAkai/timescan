@@ -1,5 +1,16 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
+import {
+  MAX_IMAGE_BASE64_CHARS,
+  MAX_LABEL_CHARS,
+  MAX_REQUEST_BYTES,
+  MAX_ROWS,
+  MAX_TIMES_PER_ROW,
+  MAX_TIME_CHARS,
+  clampText,
+  isLikelyBase64,
+} from "@/lib/limits";
+import { checkRateLimit, clientKeyFromRequest } from "@/lib/rateLimit";
 
 // The OpenAI SDK needs the Node.js runtime (not Edge), and reading a
 // timecard can take longer than the default serverless budget.
@@ -12,7 +23,7 @@ const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 
 // Shape returned to the client. Times are 24-hour "HH:MM", laid out as
 // [in1, out1, in2, out2, ...] so a blank punch is an empty string that keeps
-// the IN/OUT columns aligned — matching the grid editor's column model.
+// the IN/OUT columns aligned - matching the grid editor's column model.
 const SCAN_SCHEMA = {
   type: "object",
   properties: {
@@ -39,13 +50,13 @@ These are usually physical punch cards (uPunch / TrackMyPunch and similar) where
 
 Rules:
 - Each row of the IN/OUT punch grid becomes one row object. "label" is the row's day number or date exactly as printed (e.g. "8", "14", "1/12").
-- "times" lists that row's punches left to right as [IN, OUT, IN, OUT, ...] in 24-hour "HH:MM" form, exactly as stamped. A card that stamps "13:54" is 1:54 PM — keep it as "13:54". Do not convert to AM/PM and do not invent seconds.
+- "times" lists that row's punches left to right as [IN, OUT, IN, OUT, ...] in 24-hour "HH:MM" form, exactly as stamped. A card that stamps "13:54" is 1:54 PM - keep it as "13:54". Do not convert to AM/PM and do not invent seconds.
 - If a row has an IN with no matching OUT (or vice-versa), put an empty string "" in the missing slot so IN/OUT stay column-aligned.
-- Only read the machine IN/OUT punch columns. IGNORE: column headers (IN, OUT, REG, OT), the employee name, pay-period boxes, and especially the handwritten daily-hours / totals column on the right (values like "8", "7", "8.25", "10.5") — those are hour totals, not clock times.
-- Skip any row that has no punches at all — do not emit empty rows.
+- Only read the machine IN/OUT punch columns. IGNORE: column headers (IN, OUT, REG, OT), the employee name, pay-period boxes, and especially the handwritten daily-hours / totals column on the right (values like "8", "7", "8.25", "10.5") - those are hour totals, not clock times.
+- Skip any row that has no punches at all - do not emit empty rows.
 - Read faint or partial stamps as best you can; it is better to include your best reading than to drop a legible punch. If a digit is genuinely unreadable, omit that row rather than guessing wildly.
 
-Respond with JSON matching the required schema and nothing else — no prose, no markdown fences.`;
+Respond with JSON matching the required schema and nothing else - no prose, no markdown fences.`;
 
 // Not every OpenRouter model honours json_schema response_format, and some
 // wrap their JSON in markdown fences anyway. Recover the object rather than
@@ -76,6 +87,43 @@ function parseModelJson(raw: string): unknown {
   throw new SyntaxError("Model response was not JSON");
 }
 
+// Blocks cross-site callers that a browser would let through. Sec-Fetch-Site is
+// set by the browser and cannot be forged from script; the Origin comparison is
+// the fallback for clients that omit it. Neither stops a direct server-to-server
+// request (curl sends no Origin), so this narrows drive-by abuse from other
+// sites rather than authenticating the caller. Real protection is auth or a
+// platform firewall; see SECURITY.md.
+function isSameOrigin(request: Request): boolean {
+  const site = request.headers.get("sec-fetch-site");
+  if (site) return site === "same-origin" || site === "none";
+
+  const origin = request.headers.get("origin");
+  if (!origin) return true; // non-browser client; other guards still apply
+  try {
+    return new URL(origin).host === request.headers.get("host");
+  } catch {
+    return false;
+  }
+}
+
+/** The model's reply is third-party data: it is rendered, stored, and summed,
+ *  so it gets clamped to sane shapes before any of that. */
+function sanitizeRows(parsed: unknown): { label: string; times: string[] }[] {
+  const rows = (parsed as { rows?: unknown })?.rows;
+  if (!Array.isArray(rows)) return [];
+
+  return rows
+    .slice(0, MAX_ROWS)
+    .map((row) => {
+      const r = row as { label?: unknown; times?: unknown };
+      const times = Array.isArray(r.times)
+        ? r.times.slice(0, MAX_TIMES_PER_ROW).map((t) => clampText(t, MAX_TIME_CHARS))
+        : [];
+      return { label: clampText(r.label, MAX_LABEL_CHARS), times };
+    })
+    .filter((r) => r.times.some((t) => t !== ""));
+}
+
 export async function POST(request: Request) {
   const apiKey = process.env.OPENROUTER_API_KEY;
   const model = process.env.OPENROUTER_MODEL;
@@ -102,6 +150,28 @@ export async function POST(request: Request) {
     );
   }
 
+  // This endpoint spends money on every call, so cheap rejections come first:
+  // origin, then declared size, then rate limit, and only then is the body read.
+  if (!isSameOrigin(request)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const declaredLength = Number(request.headers.get("content-length"));
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_REQUEST_BYTES) {
+    return NextResponse.json(
+      { error: "That image is too large. Try a smaller photo." },
+      { status: 413 }
+    );
+  }
+
+  const { allowed, retryAfterSeconds } = checkRateLimit(clientKeyFromRequest(request));
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "Too many scans in a short time. Please wait a moment and try again." },
+      { status: 429, headers: { "Retry-After": String(retryAfterSeconds) } }
+    );
+  }
+
   let image: unknown;
   let mediaType: unknown;
   try {
@@ -114,6 +184,17 @@ export async function POST(request: Request) {
 
   if (typeof image !== "string" || image.length === 0) {
     return NextResponse.json({ error: "An image is required" }, { status: 400 });
+  }
+  if (image.length > MAX_IMAGE_BASE64_CHARS) {
+    return NextResponse.json(
+      { error: "That image is too large. Try a smaller photo." },
+      { status: 413 }
+    );
+  }
+  // Anything that isn't clean base64 would produce a malformed data URL
+  // upstream, so reject it here instead of paying for the round trip.
+  if (!isLikelyBase64(image)) {
+    return NextResponse.json({ error: "Invalid image encoding" }, { status: 400 });
   }
   const media =
     mediaType === "image/png" || mediaType === "image/webp" || mediaType === "image/gif"
@@ -181,15 +262,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ rows: [] });
     }
 
-    const parsed = parseModelJson(text) as {
-      rows?: { label?: unknown; times?: unknown }[];
-    };
-    const rows = (parsed.rows ?? [])
-      .map((r) => ({
-        label: typeof r.label === "string" ? r.label : "",
-        times: Array.isArray(r.times) ? r.times.map((t) => (typeof t === "string" ? t : "")) : [],
-      }))
-      .filter((r) => r.times.some((t) => t.trim() !== ""));
+    const rows = sanitizeRows(parseModelJson(text));
 
     return NextResponse.json({ rows });
   } catch (err) {
@@ -221,12 +294,24 @@ export async function POST(request: Request) {
     if (err instanceof SyntaxError) {
       return NextResponse.json(
         {
-          error: `The model (${model}) did not return readable JSON. Try a model that supports structured outputs and image input.`,
+          error:
+            "The configured model did not return readable JSON. Try a model that supports structured outputs and image input.",
         },
         { status: 502 }
       );
     }
-    const message = err instanceof Error ? err.message : "Failed to read the timecard";
-    return NextResponse.json({ error: message }, { status: 502 });
+    // Anything unrecognised stays server-side. Upstream SDK errors can carry
+    // request URLs, provider routing details, and header echoes, none of which
+    // an end user needs and some of which shouldn't be public.
+    console.error("[/api/scan] upstream failure:", err);
+    return NextResponse.json(
+      { error: "Could not read the timecard right now. Please try again." },
+      { status: 502 }
+    );
   }
+}
+
+/** Anything other than POST gets a clean 405 rather than a framework default. */
+export async function GET() {
+  return NextResponse.json({ error: "Method not allowed" }, { status: 405 });
 }

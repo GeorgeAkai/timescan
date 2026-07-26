@@ -16,7 +16,7 @@ interface TimeEntriesEditorProps {
 export default function TimeEntriesEditor({ rows, onChange }: TimeEntriesEditorProps) {
   // The number of IN/OUT column pairs is sized to whatever the data needs
   // (min 2, matching a typical timecard), plus any extra empty columns the
-  // user has asked for via "+ Add shift column" — mirroring cards that print
+  // user has asked for via "+ Add shift column" - mirroring cards that print
   // a fixed IN/OUT/IN/OUT/IN/OUT grid per day.
   const [extraPairs, setExtraPairs] = useState(0);
   const dataPairs = rows.reduce(
@@ -57,7 +57,7 @@ export default function TimeEntriesEditor({ rows, onChange }: TimeEntriesEditorP
 
   const emptyState = (
     <p className="rounded-xl border border-dashed border-border bg-surface px-3 py-6 text-center text-sm text-muted">
-      No entries yet — scan a timecard or add a row manually.
+      No entries yet - scan a timecard or add a row manually.
     </p>
   );
 
@@ -83,7 +83,7 @@ export default function TimeEntriesEditor({ rows, onChange }: TimeEntriesEditorP
             {rows.length === 0 && (
               <tr>
                 <td colSpan={pairCount * 2 + 3} className="px-3 py-6 text-center text-muted">
-                  No entries yet — scan a timecard or add a row manually.
+                  No entries yet - scan a timecard or add a row manually.
                 </td>
               </tr>
             )}

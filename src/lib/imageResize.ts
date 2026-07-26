@@ -1,6 +1,6 @@
 // Prepares a captured/uploaded timecard photo for the vision model. The model
 // reads the ordinary colour photo directly (no binarization), so this only
-// downscales very large phone photos — enough resolution for the small
+// downscales very large phone photos - enough resolution for the small
 // dot-matrix punch digits to stay legible, but small enough to keep the upload
 // under the serverless request-body limit and the image-token cost reasonable.
 

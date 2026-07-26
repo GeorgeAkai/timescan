@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 :root {
-  /* Green on white — light (the default) */
+  /* Green on white - light (the default) */
   color-scheme: light;
   --background: #f4faf6;
   --foreground: #0c1f13;
@@ -30,13 +30,12 @@
   --font-mono: var(--font-geist-mono);
 }
 
-/* Dark palette. A script in the layout resolves the saved preference
-   ("light" / "dark" / "system") to a concrete data-theme before first paint,
-   so this attribute is the single source of truth — no prefers-color-scheme
-   media query here, which would otherwise fight an explicit light choice on a
-   dark device. */
-/* Green on black — dark. Surfaces sit just above true black so cards and the
-   sticky header still read as raised, with the green carrying the accents. */
+/* Green on black, the dark palette. Surfaces sit just above true black so cards
+   and the sticky header still read as raised, with the green carrying accents.
+   A script in the layout resolves the saved preference ("light" / "dark" /
+   "system") to a concrete data-theme before first paint, so this attribute is
+   the single source of truth: no prefers-color-scheme media query here, which
+   would otherwise fight an explicit light choice on a dark device. */
 :root[data-theme="dark"] {
   color-scheme: dark;
   --background: #000000;

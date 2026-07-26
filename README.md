@@ -4,10 +4,10 @@ Scan a photo of a timecard, review the detected clock in/out punches, and save t
 
 ## How it works
 
-1. **Scan** (`/`) — drop in or select a photo of a timecard. The browser downscales the photo (`src/lib/imageResize.ts`) and posts it to `/api/scan`, which asks a vision model via [OpenRouter](https://openrouter.ai) to read the IN/OUT punch columns and return them as structured JSON. Each row's times are paired sequentially (clock-in/out, clock-in/out) to compute worked minutes, excluding gaps like lunch breaks (`src/lib/timeParser.ts`).
-2. **Review & edit** — the detected rows are shown in an editable table; labels and punch times can be corrected before saving, since faint or angled stamps aren't always read perfectly.
-3. **Save** — enter a name and date (and optional notes), then save. Records are stored in the browser's `localStorage` on your own device (`src/lib/storage.ts`), so nothing is written server-side.
-4. **History** (`/history`) — view and delete previously saved timecards.
+1. **Scan** (`/`) - drop in or select a photo of a timecard. The browser downscales the photo (`src/lib/imageResize.ts`) and posts it to `/api/scan`, which asks a vision model via [OpenRouter](https://openrouter.ai) to read the IN/OUT punch columns and return them as structured JSON. Each row's times are paired sequentially (clock-in/out, clock-in/out) to compute worked minutes, excluding gaps like lunch breaks (`src/lib/timeParser.ts`).
+2. **Review & edit** - the detected rows are shown in an editable table; labels and punch times can be corrected before saving, since faint or angled stamps aren't always read perfectly.
+3. **Save** - enter a name and date (and optional notes), then save. Records are stored in the browser's `localStorage` on your own device (`src/lib/storage.ts`), so nothing is written server-side.
+4. **History** (`/history`) - view saved timecards, mark each one **Paid** or **Not yet paid**, and delete them.
 
 The header has a theme toggle cycling **follow device → light → dark**; the choice is remembered per device. TimeScan can also be installed to a phone's home screen ("Add to Home Screen" / "Install app"), where it launches standalone with its own icon.
 
@@ -35,7 +35,16 @@ Open [http://localhost:3000](http://localhost:3000).
 
 OpenRouter reserves the full `max_tokens` against your credit balance *before* running the request, so a low-credit account can get a `402` even though the read itself is cheap. If that happens, either add credit or set `OPENROUTER_MAX_TOKENS` to something your balance covers (a card's JSON is well under 1000 tokens).
 
-Pick a model that supports **both image input and structured outputs** (`response_format: json_schema`) for the most reliable reads. Models without structured-output support often still work — the route strips markdown fences and recovers the JSON object — but they fail more often.
+Pick a model that supports **both image input and structured outputs** (`response_format: json_schema`) for the most reliable reads. Models without structured-output support often still work - the route strips markdown fences and recovers the JSON object - but they fail more often.
+
+## Security
+
+`/api/scan` costs money on every call, so it enforces a same-origin check, a
+request size cap, base64 validation, and a per-IP rate limit; security headers
+and a CSP are set in `next.config.ts`. It is **not authenticated**, and the rate
+limit is per-instance, so anyone who knows the URL can still call it. See
+[SECURITY.md](SECURITY.md) for the full review, the known gaps, and the
+recommended next steps.
 
 ## Notes
 

@@ -7,13 +7,20 @@ import {
   deleteRecord,
   getRecordsSnapshot,
   getServerRecordsSnapshot,
+  setPaymentStatus,
   subscribeToRecords,
 } from "@/lib/storage";
+import type { PaymentStatus } from "@/lib/types";
 
 // This page is prerendered, so the first paint has no records either way.
 // Tracking hydration keeps the "nothing saved yet" message from flashing
 // before localStorage has actually been read.
 const subscribeToNothing = () => () => {};
+
+const PAYMENT_OPTIONS: { value: PaymentStatus; label: string }[] = [
+  { value: "unpaid", label: "Not yet paid" },
+  { value: "paid", label: "Paid" },
+];
 
 export default function HistoryPage() {
   const records = useSyncExternalStore(
@@ -33,6 +40,14 @@ export default function HistoryPage() {
       deleteRecord(id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete record");
+    }
+  };
+
+  const updatePayment = (id: string, status: PaymentStatus) => {
+    try {
+      setPaymentStatus(id, status);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update payment status");
     }
   };
 
@@ -77,6 +92,32 @@ export default function HistoryPage() {
             {record.notes && (
               <p className="text-sm text-muted">{record.notes}</p>
             )}
+
+            <div
+              className="inline-flex self-start rounded-full border border-border bg-surface-muted p-0.5"
+              role="group"
+              aria-label={`Payment status for ${record.name}`}
+            >
+              {PAYMENT_OPTIONS.map(({ value, label }) => {
+                const active = record.paymentStatus === value;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => updatePayment(record.id, value)}
+                    className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                      active
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "text-muted hover:text-primary"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+
             <details className="text-sm">
               <summary className="cursor-pointer py-1 text-muted transition-colors hover:text-primary">
                 {record.rows.length} entr{record.rows.length === 1 ? "y" : "ies"}
@@ -86,7 +127,7 @@ export default function HistoryPage() {
                   <li key={row.id} className="flex items-baseline justify-between gap-3">
                     <span className="shrink-0 font-medium">{row.label}</span>
                     <span className="min-w-0 flex-1 truncate text-muted">
-                      {row.times.filter(Boolean).join(", ") || "—"}
+                      {row.times.filter(Boolean).join(", ") || "-"}
                     </span>
                     <span className="shrink-0 font-mono">{formatMinutes(row.minutes)}</span>
                   </li>
