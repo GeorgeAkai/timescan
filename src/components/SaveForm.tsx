@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { ParsedRow } from "@/lib/types";
 import { sumRowMinutes } from "@/lib/timeParser";
+import { createRecord } from "@/lib/storage";
 
 interface SaveFormProps {
   rows: ParsedRow[];
@@ -16,7 +17,7 @@ export default function SaveForm({ rows, onSaved }: SaveFormProps) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleSave = async () => {
+  const handleSave = () => {
     if (!name.trim() || !date) {
       setError("Name and date are required.");
       return;
@@ -29,18 +30,13 @@ export default function SaveForm({ rows, onSaved }: SaveFormProps) {
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch("/api/records", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name.trim(),
-          date,
-          notes,
-          rows,
-          totalMinutes: sumRowMinutes(rows),
-        }),
+      createRecord({
+        name: name.trim(),
+        date,
+        notes,
+        rows,
+        totalMinutes: sumRowMinutes(rows),
       });
-      if (!res.ok) throw new Error("Failed to save record");
       setName("");
       setNotes("");
       onSaved();

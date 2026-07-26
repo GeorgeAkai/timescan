@@ -6,8 +6,10 @@ Scan a photo of a timecard, review the detected clock in/out punches, and save t
 
 1. **Scan** (`/`) — drop in or select a photo of a timecard. The browser downscales the photo (`src/lib/imageResize.ts`) and posts it to `/api/scan`, which asks a vision model via [OpenRouter](https://openrouter.ai) to read the IN/OUT punch columns and return them as structured JSON. Each row's times are paired sequentially (clock-in/out, clock-in/out) to compute worked minutes, excluding gaps like lunch breaks (`src/lib/timeParser.ts`).
 2. **Review & edit** — the detected rows are shown in an editable table; labels and punch times can be corrected before saving, since faint or angled stamps aren't always read perfectly.
-3. **Save** — enter a name and date (and optional notes), then save. Records are persisted server-side to `data/records.json` via API routes under `src/app/api/records`.
+3. **Save** — enter a name and date (and optional notes), then save. Records are stored in the browser's `localStorage` on your own device (`src/lib/storage.ts`), so nothing is written server-side.
 4. **History** (`/history`) — view and delete previously saved timecards.
+
+The header has a theme toggle cycling **follow device → light → dark**; the choice is remembered per device. TimeScan can also be installed to a phone's home screen ("Add to Home Screen" / "Install app"), where it launches standalone with its own icon.
 
 ## Getting started
 
@@ -37,5 +39,5 @@ Pick a model that supports **both image input and structured outputs** (`respons
 
 ## Notes
 
-- The photo is sent to OpenRouter (and on to the model provider you select) for reading. Nothing is stored server-side except the records you explicitly save.
-- Saved records live in `data/records.json` (git-ignored) — back this up if you need the history to persist across machines.
+- The photo is sent to OpenRouter (and on to the model provider you select) for reading. It isn't stored anywhere afterwards.
+- Saved records live in the browser's `localStorage` under the `timescan.records.v1` key. They are per-device and per-browser: clearing site data wipes them, and they don't sync between your phone and your laptop. Server-side storage was removed because serverless hosts give you a read-only filesystem, so writing a JSON file worked in local dev and always failed once deployed.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { prepareImageForVision } from "@/lib/imageResize";
 import { minutesFromColumnAlignedTimeStrings } from "@/lib/timeParser";
@@ -16,12 +16,8 @@ export default function UploadScanner({ onScanned }: UploadScannerProps) {
     "idle"
   );
   const [error, setError] = useState<string | null>(null);
-  const [cameraOpen, setCameraOpen] = useState(false);
-  const [cameraError, setCameraError] = useState<string | null>(null);
   const [enhancedPreviewUrl, setEnhancedPreviewUrl] = useState<string | null>(null);
   const fileRef = useRef<File | null>(null);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
   const captureInputRef = useRef<HTMLInputElement | null>(null);
 
   const setFile = useCallback((file: File) => {
@@ -45,89 +41,6 @@ export default function UploadScanner({ onScanned }: UploadScannerProps) {
     accept: { "image/*": [] },
     multiple: false,
   });
-
-  const stopCamera = useCallback(() => {
-    streamRef.current?.getTracks().forEach((track) => track.stop());
-    streamRef.current = null;
-    setCameraOpen(false);
-  }, []);
-
-  useEffect(() => stopCamera, [stopCamera]);
-
-  const openCamera = useCallback(async () => {
-    setCameraError(null);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        // Ask for the rear camera at the highest resolution it can provide.
-        // Without these hints the browser hands back a low default stream
-        // (often 640x480), which makes captured timecards blurry and hard to
-        // OCR. "ideal" lets the device fall back gracefully if it can't hit 4K.
-        video: {
-          facingMode: { ideal: "environment" },
-          width: { ideal: 3840 },
-          height: { ideal: 2160 },
-        },
-        audio: false,
-      });
-      streamRef.current = stream;
-      setCameraOpen(true);
-      // The <video> element only mounts once cameraOpen is true, so attach
-      // the stream on the next tick when the ref is available.
-      requestAnimationFrame(() => {
-        if (videoRef.current) videoRef.current.srcObject = stream;
-      });
-    } catch (err) {
-      setCameraError(
-        err instanceof Error ? err.message : "Could not access the camera"
-      );
-    }
-  }, []);
-
-  const capturePhoto = useCallback(async () => {
-    const stream = streamRef.current;
-    const video = videoRef.current;
-    if (!stream) return;
-
-    // Prefer ImageCapture.takePhoto(): it returns a still at the camera's
-    // full *photo* resolution rather than the lower-res video preview frame,
-    // giving noticeably sharper scans. Supported on Chrome/Android; Safari
-    // and others fall through to the canvas grab below.
-    const track = stream.getVideoTracks()[0];
-    const ImageCaptureCtor = (
-      window as unknown as {
-        ImageCapture?: new (t: MediaStreamTrack) => {
-          takePhoto: () => Promise<Blob>;
-        };
-      }
-    ).ImageCapture;
-    if (track && ImageCaptureCtor) {
-      try {
-        const blob = await new ImageCaptureCtor(track).takePhoto();
-        setFile(
-          new File([blob], `timecard-${Date.now()}.jpg`, {
-            type: blob.type || "image/jpeg",
-          })
-        );
-        stopCamera();
-        return;
-      } catch {
-        // Not supported for this track — fall back to a canvas capture.
-      }
-    }
-
-    if (!video) return;
-    const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    canvas.toBlob((blob) => {
-      if (!blob) return;
-      setFile(new File([blob], `timecard-${Date.now()}.jpg`, { type: "image/jpeg" }));
-      stopCamera();
-    }, "image/jpeg", 0.95);
-  }, [setFile, stopCamera]);
 
   const scan = useCallback(async () => {
     const file = fileRef.current;
@@ -170,30 +83,6 @@ export default function UploadScanner({ onScanned }: UploadScannerProps) {
     }
   }, [onScanned]);
 
-  if (cameraOpen) {
-    return (
-      <div className="flex flex-col gap-3">
-        <div className="overflow-hidden rounded-xl border border-border">
-          <video ref={videoRef} autoPlay playsInline muted className="w-full" />
-        </div>
-        <div className="flex gap-3">
-          <button
-            onClick={capturePhoto}
-            className="flex-1 rounded-full bg-primary px-5 py-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover sm:flex-none sm:py-2.5"
-          >
-            Capture photo
-          </button>
-          <button
-            onClick={stopCamera}
-            className="rounded-full border border-border bg-surface px-5 py-3 text-sm font-medium transition-colors hover:bg-surface-muted sm:py-2.5"
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col gap-4">
       <div
@@ -227,17 +116,10 @@ export default function UploadScanner({ onScanned }: UploadScannerProps) {
         >
           {status === "scanning" ? "Scanning…" : "Scan timecard"}
         </button>
-        <button
-          type="button"
-          onClick={openCamera}
-          className="w-full rounded-full border border-border bg-surface px-5 py-3 text-sm font-medium transition-colors hover:bg-surface-muted sm:w-auto sm:py-2.5"
-        >
-          Use camera
-        </button>
         {/* The capture attribute opens the native camera app, which shoots at
-            the phone's full sensor resolution — sharper than the in-app live
-            stream (and the only high-res path on iOS, which lacks
-            ImageCapture). Offered as its own button on mobile. */}
+            the phone's full sensor resolution — sharper than an in-app live
+            stream, and the only high-res path on iOS, which lacks ImageCapture.
+            Mobile only; desktop uses the dropzone above. */}
         <button
           type="button"
           onClick={() => captureInputRef.current?.click()}
@@ -259,9 +141,6 @@ export default function UploadScanner({ onScanned }: UploadScannerProps) {
         />
       </div>
 
-      {cameraError && (
-        <p className="text-sm text-red-600 dark:text-red-400">{cameraError}</p>
-      )}
       {status === "error" && (
         <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
       )}

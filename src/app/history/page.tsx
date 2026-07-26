@@ -1,52 +1,47 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { formatMinutes } from "@/lib/timeParser";
-import type { TimecardRecord } from "@/lib/types";
+import {
+  deleteRecord,
+  getRecordsSnapshot,
+  getServerRecordsSnapshot,
+  subscribeToRecords,
+} from "@/lib/storage";
+
+// This page is prerendered, so the first paint has no records either way.
+// Tracking hydration keeps the "nothing saved yet" message from flashing
+// before localStorage has actually been read.
+const subscribeToNothing = () => () => {};
 
 export default function HistoryPage() {
-  const [records, setRecords] = useState<TimecardRecord[]>([]);
-  const [loading, setLoading] = useState(true);
+  const records = useSyncExternalStore(
+    subscribeToRecords,
+    getRecordsSnapshot,
+    getServerRecordsSnapshot
+  );
+  const hydrated = useSyncExternalStore(
+    subscribeToNothing,
+    () => true,
+    () => false
+  );
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/records")
-      .then((res) => {
-        if (!res.ok) throw new Error("Failed to load records");
-        return res.json();
-      })
-      .then((data) => {
-        if (!cancelled) setRecords(data);
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Failed to load records");
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const remove = async (id: string) => {
-    const prev = records;
-    setRecords(records.filter((r) => r.id !== id));
-    const res = await fetch(`/api/records/${id}`, { method: "DELETE" });
-    if (!res.ok) setRecords(prev);
+  const remove = (id: string) => {
+    try {
+      deleteRecord(id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete record");
+    }
   };
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 py-8 sm:px-6 sm:py-12">
       <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">History</h1>
 
-      {loading && <p className="text-sm text-muted">Loading…</p>}
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
-      {!loading && records.length === 0 && (
+      {hydrated && records.length === 0 && (
         <p className="text-sm text-muted">
           No saved timecards yet. Go scan one on the{" "}
           <Link href="/" className="font-medium text-primary underline">

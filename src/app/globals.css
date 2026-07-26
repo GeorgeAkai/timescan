@@ -1,7 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  /* Simplistic blue theme — light */
+  /* Simplistic blue theme — light (the default) */
+  color-scheme: light;
   --background: #f6f9fe;
   --foreground: #0f172a;
   --surface: #ffffff;
@@ -28,20 +29,28 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0f1a;
-    --foreground: #e6edf6;
-    --surface: #111827;
-    --surface-muted: #172033;
-    --border: #1f2b40;
-    --muted: #93a4bd;
-    --primary: #3b82f6;
-    --primary-hover: #60a5fa;
-    --primary-foreground: #0a0f1a;
-    --ring: rgba(59, 130, 246, 0.3);
-  }
+/* Dark palette. A script in the layout resolves the saved preference
+   ("light" / "dark" / "system") to a concrete data-theme before first paint,
+   so this attribute is the single source of truth — no prefers-color-scheme
+   media query here, which would otherwise fight an explicit light choice on a
+   dark device. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #0a0f1a;
+  --foreground: #e6edf6;
+  --surface: #111827;
+  --surface-muted: #172033;
+  --border: #1f2b40;
+  --muted: #93a4bd;
+  --primary: #3b82f6;
+  --primary-hover: #60a5fa;
+  --primary-foreground: #0a0f1a;
+  --ring: rgba(59, 130, 246, 0.3);
 }
+
+/* Point Tailwind's dark: variant at the same attribute, so utility classes
+   like dark:text-red-400 track the chosen theme rather than the OS setting. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 body {
   background: var(--background);

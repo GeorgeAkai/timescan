@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { Geist, Geist_Mono } from "next/font/google";
+import ThemeToggle from "@/components/ThemeToggle";
+import { THEME_INIT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -34,7 +36,13 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
+      <head>
+        {/* Sets data-theme before the first paint, so a saved light choice on a
+            dark device never flashes the dark palette. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <header className="sticky top-0 z-10 border-b border-border bg-surface/80 backdrop-blur">
           <nav className="mx-auto flex w-full max-w-3xl items-center gap-4 px-4 py-3 text-sm font-medium sm:gap-6 sm:px-6 sm:py-4">
@@ -63,6 +71,7 @@ export default function RootLayout({
             <Link href="/history" className="text-muted transition-colors hover:text-primary">
               History
             </Link>
+            <ThemeToggle />
           </nav>
         </header>
         <main className="flex flex-1 flex-col">{children}</main>
